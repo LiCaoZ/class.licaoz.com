@@ -1,0 +1,56 @@
+"use client";
+
+import React from 'react';
+import CourseScheduleParser from './components/CourseScheduleParser';
+
+const App: React.FC = () => {
+  const handleParsedInfo = (info: { current: Course | null, next: Course | null }) => {
+    console.log('Current course:', info.current);
+    console.log('Next course:', info.next);
+
+    if (info.current) {
+      if (info.current.time == "07:30-07:50") {
+        info.current.name = info.current.name + "早读";
+      } else if (info.current.time == "13:10-13:40") {
+        info.current.name = info.current.name + "午自习";
+      }
+      document.querySelector('.current')!.textContent = `草纸现在在${info.current.location}上${info.current.name}。`;
+    } else {
+      document.querySelector('.current')!.textContent = '草纸现在不在上课。';
+    }
+
+    if (info.next) {
+      if (info.next.time == "07:30-07:50") {
+        info.next.name = info.next.name + "早读";
+      } else if (info.next.time == "13:10-13:40") {
+        info.next.name = info.next.name + "午自习";
+      }
+      document.querySelector('.next')!.textContent = `下节课是 ${info.next.time} 的${info.next.name}，位于${info.next.location}。`;
+    } else {
+      document.querySelector('.next')!.textContent = '今天没有下节课了。';
+    }
+
+  };
+
+  return (
+    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
+      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
+        {/* draw a card */}
+        <div className="flex flex-col gap-4 items-center">
+          <h1 className="text-4xl font-bold text-center">草纸现在在上什么课？</h1>
+          <span className="text-lg text-center status">
+            <p className='current'>正在加载数据</p>
+            <p className='next'></p>
+          </span>
+          <CourseScheduleParser onParse={handleParsedInfo} />
+        </div>
+      </main>
+      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
+        <p className='text-md desc'>Made by LOVE by Caozhi Li, from CKG, CHN.</p>
+        <p className='text-sm desc'>※ 若你的时区并非中国标准时间 [(UTC+08:00) 北京，重庆，香港，乌鲁木齐]，课程显示可能有误。</p>
+      </footer>
+    </div>
+  );
+};
+
+export default App;
