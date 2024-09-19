@@ -4,6 +4,12 @@ import React from 'react';
 import CourseScheduleParser from './components/CourseScheduleParser';
 
 const App: React.FC = () => {
+  interface Course {
+    name: string;
+    time: string;
+    location: string;
+  }
+
   const handleParsedInfo = (info: { current: Course | null, next: Course | null }) => {
     console.log('Current course:', info.current);
     console.log('Next course:', info.next);
