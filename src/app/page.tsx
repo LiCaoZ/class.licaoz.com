@@ -13,24 +13,32 @@ const App: React.FC = () => {
   const [currentCourse, setCurrentCourse] = useState<Course | null>(null);
   const [nextCourse, setNextCourse] = useState<Course | null>(null);
 
+  const appendName = (infoItem: { time: string; name: string }) => {
+    const day = new Date().getDay();
+    const time = infoItem.time;
+
+    if (time === "07:30-07:50") {
+      infoItem.name += "早读";
+    } else if (time === "13:10-13:40") {
+      infoItem.name += "午自习";
+    } else if (time === "21:20-22:00") {
+      infoItem.name += "考练";
+    } else if ((day === 1 && time === "16:25-17:05") || 
+               (day === 7 && (time === "19:40-20:20" || time === "20:20-21:00"))) {
+      infoItem.name += "考练";
+    }
+  };
+
   const handleParsedInfo = (info: { current: Course | null, next: Course | null }) => {
     console.log('Current course:', info.current);
     console.log('Next course:', info.next);
 
     if (info.current) {
-      if (info.current.time === "07:30-07:50") {
-        info.current.name = info.current.name + "早读";
-      } else if (info.current.time === "13:10-13:40") {
-        info.current.name = info.current.name + "午自习";
-      }
+      appendName(info.current);
     }
 
     if (info.next) {
-      if (info.next.time === "07:30-07:50") {
-        info.next.name = info.next.name + "早读";
-      } else if (info.next.time === "13:10-13:40") {
-        info.next.name = info.next.name + "午自习";
-      }
+      appendName(info.next);
     }
 
     setCurrentCourse(info.current);
