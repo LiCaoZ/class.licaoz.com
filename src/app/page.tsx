@@ -56,7 +56,7 @@ const App: React.FC = () => {
               {currentCourse ? `草纸现在在${currentCourse.location}上${currentCourse.name}。` : '草纸现在不在上课。'}
             </p>
             <p className='next'>
-              {nextCourse ? `下节课是 ${nextCourse.time} 的${nextCourse.name}，位于${nextCourse.location}。` : '今天没有下节课了。'}
+              {nextCourse ? `下节课是 ${nextCourse.time} 的${nextCourse.name}，位于${nextCourse.location}。` : '今天没有更多课了。'}
             </p>
           </span>
           <CourseScheduleParser onParse={handleParsedInfo} />
