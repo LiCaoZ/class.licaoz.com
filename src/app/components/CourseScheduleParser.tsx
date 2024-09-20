@@ -56,9 +56,6 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
     };
 
     parseSchedule();
-    const timer = setInterval(parseSchedule, 60000); // 每分钟更新一次
-
-    return () => clearInterval(timer);
   }, [scheduleData, onParse]);
 
   const getCourseInfo = (schedule: ScheduleData, date: Date): CourseInfo => {
@@ -111,7 +108,7 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
     return { current: currentCourse, next: nextCourse };
   };
 
-  return null; // 这个组件不渲染任何内容，只负责解析和传递数据
+  return null;
 };
 
 export default CourseScheduleParser;
