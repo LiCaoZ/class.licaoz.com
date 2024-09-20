@@ -22,10 +22,10 @@ const App: React.FC = () => {
       infoItem.name += "早读";
     } else if (time === "13:10-13:40") {
       infoItem.name += "午自习";
-    } else if (time === "21:20-22:00") {
+    } else if (day != 7 && time === "21:20-22:00") {
       infoItem.name += "考练";
     } else if ((day === 1 && time === "16:25-17:05") || 
-               (day === 7 && (time === "19:40-20:20" || time === "20:20-21:00"))) {
+               (day === 7 && (time === "19:40-20:20" || time === "20:30-21:10"))) {
       infoItem.name += "考练";
     }
   };
