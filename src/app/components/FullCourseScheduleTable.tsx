@@ -37,10 +37,12 @@ const FullCourseScheduleTable: React.FC = () => {
         fetchSchedule();
     }, []);
 
+    // Function to detect user's timezone offset
     const detectTimezoneOffset = (): number => {
         return new Date().getTimezoneOffset();
     };
 
+    // Function to convert time slot to UTC+08:00
     const convertToUTC8 = (timeSlot: string): string => {
         const [startTime, endTime] = timeSlot.split('-');
         const offset = detectTimezoneOffset();
@@ -63,6 +65,7 @@ const FullCourseScheduleTable: React.FC = () => {
         return days[day - 1];
     };
 
+    // Function to create the schedule grid with converted time slots
     const createScheduleGrid = (): (CourseCell | null)[][] => {
         if (!scheduleData) return [];
 

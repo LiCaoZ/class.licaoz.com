@@ -58,10 +58,12 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
     parseSchedule();
   }, [scheduleData, onParse]);
 
+  // Function to detect user's timezone offset
   const detectTimezoneOffset = (): number => {
     return new Date().getTimezoneOffset();
   };
 
+  // Function to convert date to UTC+08:00
   const convertToUTC8 = (date: Date): Date => {
     const offset = detectTimezoneOffset();
     const utc8Offset = -480; // UTC+08:00 offset in minutes
@@ -69,6 +71,7 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
     return new Date(date.getTime() + diff * 60000);
   };
 
+  // Function to get course information based on the current date and time
   const getCourseInfo = (schedule: ScheduleData, date: Date): CourseInfo => {
     const convertedDate = convertToUTC8(date);
     const day = convertedDate.getDay() === 0 ? 7 : convertedDate.getDay();
