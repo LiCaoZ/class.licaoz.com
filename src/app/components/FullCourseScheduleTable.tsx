@@ -37,6 +37,27 @@ const FullCourseScheduleTable: React.FC = () => {
         fetchSchedule();
     }, []);
 
+    const detectTimezoneOffset = (): number => {
+        return new Date().getTimezoneOffset();
+    };
+
+    const convertToUTC8 = (timeSlot: string): string => {
+        const [startTime, endTime] = timeSlot.split('-');
+        const offset = detectTimezoneOffset();
+        const utc8Offset = -480; // UTC+08:00 offset in minutes
+        const diff = utc8Offset - offset;
+
+        const convertTime = (time: string): string => {
+            const [hours, minutes] = time.split(':').map(Number);
+            const date = new Date();
+            date.setHours(hours, minutes);
+            date.setMinutes(date.getMinutes() + diff);
+            return date.toTimeString().slice(0, 5);
+        };
+
+        return `${convertTime(startTime)}-${convertTime(endTime)}`;
+    };
+
     const getDayName = (day: number): string => {
         const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
         return days[day - 1];
@@ -52,6 +73,7 @@ const FullCourseScheduleTable: React.FC = () => {
             const dayCourses = scheduleData.schedule[day.toString()] || [];
 
             scheduleData.timeSlots.forEach((timeSlot, timeSlotIndex) => {
+                const convertedTimeSlot = convertToUTC8(timeSlot);
                 const courseSlot = dayCourses.find(([slotIndex]) => slotIndex === timeSlotIndex);
 
                 if (courseSlot) {
@@ -61,14 +83,14 @@ const FullCourseScheduleTable: React.FC = () => {
                         let courseName = course.name;
 
                         // Add suffix based on time and day
-                        if (timeSlot === "07:30-07:50") {
+                        if (convertedTimeSlot === "07:30-07:50") {
                             courseName += "早读";
-                        } else if (timeSlot === "13:10-13:40") {
+                        } else if (convertedTimeSlot === "13:10-13:40") {
                             courseName += "午自习";
-                        } else if (day != 7 && timeSlot === "21:20-22:00") {
+                        } else if (day != 7 && convertedTimeSlot === "21:20-22:00") {
                             courseName += "考练";
-                        } else if ((day === 1 && timeSlot === "16:25-17:05") ||
-                            (day === 7 && (timeSlot === "19:40-20:20" || timeSlot === "20:30-21:10"))) {
+                        } else if ((day === 1 && convertedTimeSlot === "16:25-17:05") ||
+                            (day === 7 && (convertedTimeSlot === "19:40-20:20" || convertedTimeSlot === "20:30-21:10"))) {
                             courseName += "考练";
                         }
 

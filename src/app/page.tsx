@@ -30,15 +30,30 @@ const App: React.FC = () => {
     }
   };
 
+  const detectTimezoneOffset = (): number => {
+    return new Date().getTimezoneOffset();
+  };
+
+  const convertToUTC8 = (date: Date): Date => {
+    const offset = detectTimezoneOffset();
+    const utc8Offset = -480; // UTC+08:00 offset in minutes
+    const diff = utc8Offset - offset;
+    return new Date(date.getTime() + diff * 60000);
+  };
+
   const handleParsedInfo = (info: { current: Course | null, next: Course | null }) => {
     console.log('Current course:', info.current);
     console.log('Next course:', info.next);
 
     if (info.current) {
+      const convertedCurrentTime = convertToUTC8(new Date());
+      info.current.time = `${convertedCurrentTime.getHours()}:${convertedCurrentTime.getMinutes()}`;
       appendName(info.current);
     }
 
     if (info.next) {
+      const convertedNextTime = convertToUTC8(new Date());
+      info.next.time = `${convertedNextTime.getHours()}:${convertedNextTime.getMinutes()}`;
       appendName(info.next);
     }
 
