@@ -58,9 +58,22 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
     parseSchedule();
   }, [scheduleData, onParse]);
 
+  const convertToUTC8 = (date: Date): Date => {
+    const offset = date.getTimezoneOffset();
+    const utc8Offset = -480; // UTC+8 is 480 minutes ahead of UTC
+    const diff = utc8Offset - offset;
+    return new Date(date.getTime() + diff * 60000);
+  };
+
+  const isUTC8 = (date: Date): boolean => {
+    const offset = date.getTimezoneOffset();
+    return offset === -480;
+  };
+
   const getCourseInfo = (schedule: ScheduleData, date: Date): CourseInfo => {
-    const day = date.getDay() === 0 ? 7 : date.getDay();
-    const currentTime = date.toTimeString().slice(0, 5);
+    const utc8Date = isUTC8(date) ? date : convertToUTC8(date);
+    const day = utc8Date.getDay() === 0 ? 7 : utc8Date.getDay();
+    const currentTime = utc8Date.toTimeString().slice(0, 5);
     
     const todayCourses = schedule.schedule[day];
     
