@@ -22,6 +22,7 @@ interface CourseCell {
 
 const FullCourseScheduleTable: React.FC = () => {
     const [scheduleData, setScheduleData] = useState<ScheduleData | null>(null);
+    const [fetchError, setFetchError] = useState<boolean>(false);
 
     useEffect(() => {
         const fetchSchedule = async () => {
@@ -31,6 +32,7 @@ const FullCourseScheduleTable: React.FC = () => {
                 setScheduleData(data);
             } catch (error) {
                 console.error('Failed to fetch schedule:', error);
+                setFetchError(true);
             }
         };
 
@@ -90,6 +92,10 @@ const FullCourseScheduleTable: React.FC = () => {
 
         return grid;
     };
+
+    if (fetchError) {
+        return <div className="text-gray-800 dark:text-gray-200">课程表数据文件损坏或丢失。</div>;
+    }
 
     if (!scheduleData) {
         return <div className="text-gray-200 dark:text-gray-300">Loading...</div>;
