@@ -15,7 +15,6 @@ interface ScheduleData {
     courses: {
         id: number;
         name: string;
-        teacher: string;
         locationIndex: number;
     }[];
     schedule: {
@@ -25,7 +24,6 @@ interface ScheduleData {
 
 interface CourseCell {
     name: string;
-    teacher: string;
     location: string;
     slotNumber?: string;
 }
@@ -56,13 +54,29 @@ const FullCourseScheduleTable: React.FC = () => {
 
     const getCurrentTimeSlots = (): string[] => {
         if (!scheduleData) return [];
-        // Determine if we should use summer or autumn schedule
-        const now = new Date();
-        const month = now.getMonth() + 1;
-        const day = now.getDate();
         
-        // Use summer schedule for September, autumn for October onwards
-        if (month === 9 || (month === 8 && day >= 25)) {
+        // Summer schedule: from first Monday in May until first Monday in October  
+        // Autumn/Winter schedule: from first Monday in October until first Monday in May (next year)
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth(); // 0-11
+        
+        // Find first Monday of May in current year
+        const mayFirst = new Date(year, 4, 1); // May 1st
+        const mayFirstDayOfWeek = mayFirst.getDay();
+        const mayFirstMonday = mayFirstDayOfWeek === 1 ? 1 : (8 - mayFirstDayOfWeek + 1);
+        
+        // Find first Monday of October in current year
+        const octoberFirst = new Date(year, 9, 1); // October 1st
+        const octoberFirstDayOfWeek = octoberFirst.getDay();
+        const octoberFirstMonday = octoberFirstDayOfWeek === 1 ? 1 : (8 - octoberFirstDayOfWeek + 1);
+        
+        // Create dates for comparison
+        const summerStart = new Date(year, 4, mayFirstMonday); // First Monday of May
+        const summerEnd = new Date(year, 9, octoberFirstMonday); // First Monday of October
+        
+        // Use summer schedule if current date is between first Monday of May and first Monday of October
+        if (now >= summerStart && now < summerEnd) {
             return scheduleData.timeSlots.summer;
         } else {
             return scheduleData.timeSlots.autumn;
@@ -94,10 +108,9 @@ const FullCourseScheduleTable: React.FC = () => {
                 if (courseSlot) {
                     const [, courseId] = courseSlot;
                     const course = scheduleData.courses.find(c => c.id === courseId);
-                    if (course && course.name !== "空堂") {
+                    if (course) {
                         daySchedule.push({
                             name: course.name,
-                            teacher: course.teacher,
                             location: formatLocation(scheduleData.locations[course.locationIndex]),
                             slotNumber: slotNumber
                         });
@@ -130,9 +143,9 @@ const FullCourseScheduleTable: React.FC = () => {
     });
 
     return (
-        <div className="p-4">
-            <div className="overflow-x-auto">
-                <table className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm">
+        <div className="w-full">
+            <div className="overflow-x-auto border border-gray-300 dark:border-gray-700 rounded-lg">
+                <table className="w-full bg-white dark:bg-gray-800 text-sm min-w-[800px]">
                     <thead>
                         <tr className="bg-gray-100 dark:bg-gray-700">
                             <th className="py-2 px-2 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 min-w-[80px]">节次/时间</th>
@@ -155,7 +168,6 @@ const FullCourseScheduleTable: React.FC = () => {
                                         {day[slotIndex] ? (
                                             <div className="space-y-1">
                                                 <div className="font-semibold text-gray-800 dark:text-gray-200 text-sm">{day[slotIndex]?.name}</div>
-                                                <div className="text-xs text-gray-600 dark:text-gray-400">{day[slotIndex]?.teacher}</div>
                                                 <div className="text-xs text-gray-500 dark:text-gray-500">{day[slotIndex]?.location}</div>
                                             </div>
                                         ) : (

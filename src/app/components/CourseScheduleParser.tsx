@@ -26,7 +26,6 @@ interface ScheduleData {
   courses: {
     id: number;
     name: string;
-    teacher: string;
     locationIndex: number;
   }[];
   schedule: {
@@ -59,14 +58,30 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
   useEffect(() => {
     const getCurrentTimeSlots = (date: Date): string[] => {
       if (!scheduleData) return [];
-      // Determine if we should use summer or autumn schedule
-      // Summer: from start of semester until first Monday of October
-      // For now, using simplified logic - can be refined based on actual dates
-      const month = date.getMonth() + 1; // getMonth() returns 0-11
-      const day = date.getDate();
       
-      // Use summer schedule for September, autumn for October onwards
-      if (month === 9 || (month === 8 && day >= 25)) {
+      // Summer schedule: from first Monday in May until first Monday in October
+      // Autumn/Winter schedule: from first Monday in October until first Monday in May (next year)
+      const year = date.getFullYear();
+      const month = date.getMonth(); // 0-11
+      const dayOfMonth = date.getDate();
+      const dayOfWeek = date.getDay(); // 0=Sunday, 1=Monday, etc.
+      
+      // Find first Monday of May in current year
+      const mayFirst = new Date(year, 4, 1); // May 1st
+      const mayFirstDayOfWeek = mayFirst.getDay();
+      const mayFirstMonday = mayFirstDayOfWeek === 1 ? 1 : (8 - mayFirstDayOfWeek + 1);
+      
+      // Find first Monday of October in current year
+      const octoberFirst = new Date(year, 9, 1); // October 1st
+      const octoberFirstDayOfWeek = octoberFirst.getDay();
+      const octoberFirstMonday = octoberFirstDayOfWeek === 1 ? 1 : (8 - octoberFirstDayOfWeek + 1);
+      
+      // Create dates for comparison
+      const summerStart = new Date(year, 4, mayFirstMonday); // First Monday of May
+      const summerEnd = new Date(year, 9, octoberFirstMonday); // First Monday of October
+      
+      // Use summer schedule if current date is between first Monday of May and first Monday of October
+      if (date >= summerStart && date < summerEnd) {
         return scheduleData.timeSlots.summer;
       } else {
         return scheduleData.timeSlots.autumn;
@@ -99,7 +114,7 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
         const [startTime, endTime] = currentTimeSlots[slotIndex].split('-');
         const course = schedule.courses.find(c => c.id === courseId);
 
-        if (!course || course.name === "空堂") continue;
+        if (!course) continue;
 
         const courseInfo: Course = {
           name: course.name,
@@ -119,7 +134,7 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
             const [nextStartTime, nextEndTime] = currentTimeSlots[nextSlotIndex].split('-');
             const nextCourseData = schedule.courses.find(c => c.id === nextCourseId);
             
-            if (nextCourseData && nextCourseData.name !== "空堂") {
+            if (nextCourseData) {
               nextCourse = {
                 name: nextCourseData.name,
                 time: `${nextStartTime}-${nextEndTime}`,

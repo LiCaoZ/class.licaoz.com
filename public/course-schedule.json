@@ -51,57 +51,43 @@
     ],
     "courses": [
         {
-            "id": 0,
-            "name": "空堂",
-            "teacher": "",
-            "locationIndex": 0
-        },
-        {
             "id": 1,
             "name": "线性代数",
-            "teacher": "张教授",
             "locationIndex": 0
         },
         {
             "id": 2,
             "name": "网络安全导论",
-            "teacher": "李教授", 
             "locationIndex": 1
         },
         {
             "id": 3,
             "name": "C程序设计",
-            "teacher": "王教授",
             "locationIndex": 2
         },
         {
             "id": 4,
             "name": "大学英语",
-            "teacher": "刘教授",
             "locationIndex": 3
         },
         {
             "id": 5,
             "name": "思想道德与法治",
-            "teacher": "陈教授",
             "locationIndex": 4
         },
         {
             "id": 6,
             "name": "体育",
-            "teacher": "赵教练",
             "locationIndex": 4
         },
         {
             "id": 7,
             "name": "计算机网络",
-            "teacher": "孙教授",
             "locationIndex": 5
         },
         {
             "id": 8,
             "name": "网络安全实验",
-            "teacher": "吴教授",
             "locationIndex": 6
         }
     ],
