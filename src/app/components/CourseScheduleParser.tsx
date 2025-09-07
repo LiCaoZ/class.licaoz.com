@@ -12,8 +12,17 @@ interface Course {
 }
 
 interface ScheduleData {
-  timeSlots: string[];
-  locations: string[];
+  timeSlots: {
+    summer: string[];
+    autumn: string[];
+  };
+  slotMapping: {
+    [key: string]: number;
+  };
+  locations: {
+    building: string;
+    room: string;
+  }[];
   courses: {
     id: number;
     name: string;
@@ -21,7 +30,7 @@ interface ScheduleData {
     locationIndex: number;
   }[];
   schedule: {
-    [key: string]: [number, number][];
+    [key: string]: [string, number][];
   };
 }
 
@@ -48,6 +57,89 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
   }, []);
 
   useEffect(() => {
+    const getCurrentTimeSlots = (date: Date): string[] => {
+      if (!scheduleData) return [];
+      // Determine if we should use summer or autumn schedule
+      // Summer: from start of semester until first Monday of October
+      // For now, using simplified logic - can be refined based on actual dates
+      const month = date.getMonth() + 1; // getMonth() returns 0-11
+      const day = date.getDate();
+      
+      // Use summer schedule for September, autumn for October onwards
+      if (month === 9 || (month === 8 && day >= 25)) {
+        return scheduleData.timeSlots.summer;
+      } else {
+        return scheduleData.timeSlots.autumn;
+      }
+    };
+
+    const formatLocation = (location: { building: string; room: string }): string => {
+      return location.room ? `${location.building}-${location.room}` : location.building;
+    };
+
+    const getCourseInfo = (schedule: ScheduleData, date: Date): CourseInfo => {
+      const utc8Date = isUTC8(date) ? date : convertToUTC8(date);
+      const day = utc8Date.getDay() === 0 ? 7 : utc8Date.getDay();
+      const currentTime = utc8Date.toTimeString().slice(0, 5);
+      
+      const todayCourses = schedule.schedule[day];
+      
+      if (!todayCourses) return { current: null, next: null };
+
+      const currentTimeSlots = getCurrentTimeSlots(utc8Date);
+      let currentCourse: Course | null = null;
+      let nextCourse: Course | null = null;
+
+      for (let i = 0; i < todayCourses.length; i++) {
+        const [slotNumber, courseId] = todayCourses[i];
+        const slotIndex = schedule.slotMapping[slotNumber];
+        
+        if (slotIndex === undefined || slotIndex >= currentTimeSlots.length) continue;
+        
+        const [startTime, endTime] = currentTimeSlots[slotIndex].split('-');
+        const course = schedule.courses.find(c => c.id === courseId);
+
+        if (!course || course.name === "空堂") continue;
+
+        const courseInfo: Course = {
+          name: course.name,
+          time: `${startTime}-${endTime}`,
+          location: formatLocation(schedule.locations[course.locationIndex])
+        };
+
+        if (currentTime >= startTime && currentTime < endTime) {
+          currentCourse = courseInfo;
+          // Find next course
+          for (let j = i + 1; j < todayCourses.length; j++) {
+            const [nextSlotNumber, nextCourseId] = todayCourses[j];
+            const nextSlotIndex = schedule.slotMapping[nextSlotNumber];
+            
+            if (nextSlotIndex === undefined || nextSlotIndex >= currentTimeSlots.length) continue;
+            
+            const [nextStartTime, nextEndTime] = currentTimeSlots[nextSlotIndex].split('-');
+            const nextCourseData = schedule.courses.find(c => c.id === nextCourseId);
+            
+            if (nextCourseData && nextCourseData.name !== "空堂") {
+              nextCourse = {
+                name: nextCourseData.name,
+                time: `${nextStartTime}-${nextEndTime}`,
+                location: formatLocation(schedule.locations[nextCourseData.locationIndex])
+              };
+              break;
+            }
+          }
+          break;
+        }
+
+        if (currentTime < startTime) {
+          nextCourse = courseInfo;
+          break;
+        }
+      }
+
+      return { current: currentCourse, next: nextCourse };
+    };
+
     const parseSchedule = () => {
       if (scheduleData) {
         const courseInfo = getCourseInfo(scheduleData, new Date());
@@ -68,57 +160,6 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
   const isUTC8 = (date: Date): boolean => {
     const offset = date.getTimezoneOffset();
     return offset === -480;
-  };
-
-  const getCourseInfo = (schedule: ScheduleData, date: Date): CourseInfo => {
-    const utc8Date = isUTC8(date) ? date : convertToUTC8(date);
-    const day = utc8Date.getDay() === 0 ? 7 : utc8Date.getDay();
-    const currentTime = utc8Date.toTimeString().slice(0, 5);
-    
-    const todayCourses = schedule.schedule[day];
-    
-    if (!todayCourses) return { current: null, next: null };
-
-    let currentCourse: Course | null = null;
-    let nextCourse: Course | null = null;
-
-    for (let i = 0; i < todayCourses.length; i++) {
-      const [timeSlotIndex, courseId] = todayCourses[i];
-      const [startTime, endTime] = schedule.timeSlots[timeSlotIndex].split('-');
-      const course = schedule.courses.find(c => c.id === courseId);
-
-      if (!course) continue;
-
-      const courseInfo: Course = {
-        name: course.name,
-        time: `${startTime}-${endTime}`,
-        location: schedule.locations[course.locationIndex]
-      };
-
-      if (currentTime >= startTime && currentTime < endTime) {
-        currentCourse = courseInfo;
-        if (i < todayCourses.length - 1) {
-          const [nextTimeSlotIndex, nextCourseId] = todayCourses[i + 1];
-          const [nextStartTime, nextEndTime] = schedule.timeSlots[nextTimeSlotIndex].split('-');
-          const nextCourseData = schedule.courses.find(c => c.id === nextCourseId);
-          if (nextCourseData) {
-            nextCourse = {
-              name: nextCourseData.name,
-              time: `${nextStartTime}-${nextEndTime}`,
-              location: schedule.locations[nextCourseData.locationIndex]
-            };
-          }
-        }
-        break;
-      }
-
-      if (currentTime < startTime) {
-        nextCourse = courseInfo;
-        break;
-      }
-    }
-
-    return { current: currentCourse, next: nextCourse };
   };
 
   return null;

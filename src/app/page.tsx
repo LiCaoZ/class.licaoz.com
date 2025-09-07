@@ -14,33 +14,11 @@ const App: React.FC = () => {
   const [currentCourse, setCurrentCourse] = useState<Course | null>(null);
   const [nextCourse, setNextCourse] = useState<Course | null>(null);
 
-  const appendName = (infoItem: { time: string; name: string }) => {
-    const day = new Date().getDay();
-    const time = infoItem.time;
 
-    if (time === "07:30-07:50") {
-      infoItem.name += "早读";
-    } else if (time === "13:10-13:40") {
-      infoItem.name += "午自习";
-    } else if (day != 7 && time === "21:20-22:00") {
-      infoItem.name += "考练";
-    } else if ((day === 1 && time === "16:25-17:05") || 
-               (day === 7 && (time === "19:40-20:20" || time === "20:30-21:10"))) {
-      infoItem.name += "考练";
-    }
-  };
 
   const handleParsedInfo = (info: { current: Course | null, next: Course | null }) => {
     console.log('Current course:', info.current);
     console.log('Next course:', info.next);
-
-    if (info.current) {
-      appendName(info.current);
-    }
-
-    if (info.next) {
-      appendName(info.next);
-    }
 
     setCurrentCourse(info.current);
     setNextCourse(info.next);
