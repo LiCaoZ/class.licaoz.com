@@ -1,23 +1,39 @@
 import React, { useState, useEffect } from 'react';
 
-interface ScheduleData {
-    timeSlots: string[];
-    locations: string[];
-    courses: {
-        id: number;
-        name: string;
-        teacher: string;
-        locationIndex: number;
+interface CourseData {
+    id: number;
+    name: string;
+    locationIndex: number;
+    weeks?: string;
+    weekSlots?: {
+        weeks: string;
+        slots: string[];
     }[];
+}
+
+interface ScheduleData {
+    timeSlots: {
+        summer: string[];
+        autumn: string[];
+    };
+    slotMapping: {
+        [key: string]: number;
+    };
+    locations: {
+        building: string;
+        room: string;
+    }[];
+    courses: CourseData[];
     schedule: {
-        [key: string]: [number, number][];
+        [key: string]: [string, number][];
     };
 }
 
 interface CourseCell {
     name: string;
-    teacher: string;
     location: string;
+    slotNumber?: string;
+    weeks?: string;
 }
 
 const FullCourseScheduleTable: React.FC = () => {
@@ -44,40 +60,85 @@ const FullCourseScheduleTable: React.FC = () => {
         return days[day - 1];
     };
 
+    const getCurrentTimeSlots = (): string[] => {
+        if (!scheduleData) return [];
+        
+        // Summer schedule: from first Monday in May until first Monday in October  
+        // Autumn/Winter schedule: from first Monday in October until first Monday in May (next year)
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth(); // 0-11
+        
+        // Find first Monday of May in current year
+        const mayFirst = new Date(year, 4, 1); // May 1st
+        const mayFirstDayOfWeek = mayFirst.getDay();
+        const mayFirstMonday = mayFirstDayOfWeek === 1 ? 1 : (8 - mayFirstDayOfWeek + 1);
+        
+        // Find first Monday of October in current year
+        const octoberFirst = new Date(year, 9, 1); // October 1st
+        const octoberFirstDayOfWeek = octoberFirst.getDay();
+        const octoberFirstMonday = octoberFirstDayOfWeek === 1 ? 1 : (8 - octoberFirstDayOfWeek + 1);
+        
+        // Create dates for comparison
+        const summerStart = new Date(year, 4, mayFirstMonday); // First Monday of May
+        const summerEnd = new Date(year, 9, octoberFirstMonday); // First Monday of October
+        
+        // Use summer schedule if current date is between first Monday of May and first Monday of October
+        if (now >= summerStart && now < summerEnd) {
+            return scheduleData.timeSlots.summer;
+        } else {
+            return scheduleData.timeSlots.autumn;
+        }
+    };
+
+    const formatLocation = (location: { building: string; room: string }): string => {
+        if (!location.building && !location.room) return '';
+        return location.room ? `${location.building}-${location.room}` : location.building;
+    };
+
+    const getCourseWeeksForSlot = (course: CourseData, slotNumber: string): string => {
+        // Handle courses with weekSlots (variable slot schedules)
+        if (course.weekSlots) {
+            for (const weekSlot of course.weekSlots) {
+                if (weekSlot.slots.includes(slotNumber)) {
+                    return weekSlot.weeks;
+                }
+            }
+            return '';
+        }
+        
+        // Handle regular courses with weeks
+        return course.weeks || '';
+    };
+
     const createScheduleGrid = (): (CourseCell | null)[][] => {
         if (!scheduleData) return [];
 
+        const currentTimeSlots = getCurrentTimeSlots();
         const grid: (CourseCell | null)[][] = [];
+
+        // Create a complete list of all possible slot numbers for the grid
+        const allSlotNumbers = Object.keys(scheduleData.slotMapping).sort((a, b) => {
+            return scheduleData.slotMapping[a] - scheduleData.slotMapping[b];
+        });
 
         for (let day = 1; day <= 7; day++) {
             const daySchedule: (CourseCell | null)[] = [];
             const dayCourses = scheduleData.schedule[day.toString()] || [];
 
-            scheduleData.timeSlots.forEach((timeSlot, timeSlotIndex) => {
-                const courseSlot = dayCourses.find(([slotIndex]) => slotIndex === timeSlotIndex);
+            allSlotNumbers.forEach((slotNumber) => {
+                const courseSlot = dayCourses.find(([slot]) => slot === slotNumber);
 
                 if (courseSlot) {
                     const [, courseId] = courseSlot;
                     const course = scheduleData.courses.find(c => c.id === courseId);
                     if (course) {
-                        let courseName = course.name;
-
-                        // Add suffix based on time and day
-                        if (timeSlot === "07:30-07:50") {
-                            courseName += "早读";
-                        } else if (timeSlot === "13:10-13:40") {
-                            courseName += "午自习";
-                        } else if (day != 7 && timeSlot === "21:20-22:00") {
-                            courseName += "考练";
-                        } else if ((day === 1 && timeSlot === "16:25-17:05") ||
-                            (day === 7 && (timeSlot === "19:40-20:20" || timeSlot === "20:30-21:10"))) {
-                            courseName += "考练";
-                        }
-
+                        const weeks = getCourseWeeksForSlot(course, slotNumber);
                         daySchedule.push({
-                            name: courseName,
-                            teacher: course.teacher,
-                            location: scheduleData.locations[course.locationIndex]
+                            name: course.name,
+                            location: formatLocation(scheduleData.locations[course.locationIndex]),
+                            slotNumber: slotNumber,
+                            weeks: weeks
                         });
                     } else {
                         daySchedule.push(null);
@@ -102,29 +163,44 @@ const FullCourseScheduleTable: React.FC = () => {
     }
 
     const scheduleGrid = createScheduleGrid();
+    const currentTimeSlots = getCurrentTimeSlots();
+    const allSlotNumbers = Object.keys(scheduleData?.slotMapping || {}).sort((a, b) => {
+        return (scheduleData?.slotMapping[a] || 0) - (scheduleData?.slotMapping[b] || 0);
+    });
 
     return (
-        <div className="p-4">
-            <div className="table-container">
-                <table className="table bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
+        <div className="w-full max-w-screen-lg mx-auto">
+            <div className="overflow-x-auto rounded-lg">
+                <table className="w-full bg-white dark:bg-gray-800 text-sm min-w-[800px]">
                     <thead>
                         <tr className="bg-gray-100 dark:bg-gray-700">
+                            <th className="py-2 px-2 text-gray-800 dark:text-gray-200 min-w-[80px]">节次/时间</th>
                             {[1, 2, 3, 4, 5, 6, 7].map(day => (
-                                <th key={day} className="py-2 px-4 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200">{getDayName(day)}</th>
+                                <th key={day} className="py-2 px-2 text-gray-800 dark:text-gray-200 min-w-[120px]">{getDayName(day)}</th>
                             ))}
                         </tr>
                     </thead>
                     <tbody>
-                        {scheduleData.timeSlots.map((_, timeIndex) => (
-                            <tr key={timeIndex} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        {allSlotNumbers.map((slotNumber, slotIndex) => (
+                            <tr key={slotNumber} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                <td className="py-2 px-2 font-medium text-center bg-gray-50 dark:bg-gray-800">
+                                    <div className="text-gray-800 dark:text-gray-200">第{slotNumber}节</div>
+                                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                                        {currentTimeSlots[scheduleData?.slotMapping[slotNumber] || 0] || ''}
+                                    </div>
+                                </td>
                                 {scheduleGrid.map((day, dayIndex) => (
-                                    <td key={dayIndex} className="py-2 px-4 border border-gray-300 dark:border-gray-600">
-                                        {day[timeIndex] ? (
-                                            <>
-                                                <div className="font-semibold text-gray-800 dark:text-gray-200">{day[timeIndex]?.name}</div>
-                                                <div className="text-sm text-gray-600 dark:text-gray-400">{day[timeIndex]?.teacher}</div>
-                                                <div className="text-sm text-gray-500 dark:text-gray-500">{day[timeIndex]?.location}</div>
-                                            </>
+                                    <td key={dayIndex} className="py-2 px-2">
+                                        {day[slotIndex] ? (
+                                            <div className="space-y-1">
+                                                <div className="font-semibold text-gray-800 dark:text-gray-200 text-sm">{day[slotIndex]?.name}</div>
+                                                {day[slotIndex]?.location && (
+                                                    <div className="text-xs text-gray-500 dark:text-gray-500">{day[slotIndex]?.location}</div>
+                                                )}
+                                                {day[slotIndex]?.weeks && (
+                                                    <div className="text-xs text-blue-600 dark:text-blue-400">{day[slotIndex]?.weeks}周</div>
+                                                )}
+                                            </div>
                                         ) : (
                                             <span className="text-gray-400 dark:text-gray-600">-</span>
                                         )}
