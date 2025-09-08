@@ -205,7 +205,7 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
     const semesterEnd = new Date(scheduleData.semesterInfo.endDate);
     
     if (utc8Date < firstClassDate) {
-      // Find first class
+      // Find first class on or after September 15th afternoon (period 7+)
       for (let day = 1; day <= 7; day++) {
         const dayCourses = scheduleData.schedule[day.toString()] || [];
         for (const [slotNumber, courseId] of dayCourses) {
@@ -213,13 +213,22 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
           if (course && isCourseActiveInWeek(course, 4, slotNumber)) { // Week 4 is when most classes start
             const slotIndex = scheduleData.slotMapping[slotNumber];
             if (slotIndex !== undefined && slotIndex < currentTimeSlots.length) {
-              const [startTime] = currentTimeSlots[slotIndex].split('-');
-              const location = formatLocation(scheduleData.locations[course.locationIndex]);
+              const slotNum = parseInt(slotNumber);
               
+              // On September 15th (firstClassDate), only show classes from period 7 onwards
               const classDate = new Date(firstClassDate);
-              // Adjust to correct day of week
               const targetDayOffset = day - firstClassDate.getDay();
               classDate.setDate(classDate.getDate() + targetDayOffset);
+              
+              const isSameDayAsFirstClass = classDate.toDateString() === firstClassDate.toDateString();
+              
+              // If it's the same day as first class date (Sep 15), only show period 7+ classes
+              if (isSameDayAsFirstClass && slotNum < scheduleData.semesterInfo.firstClassPeriod) {
+                continue;
+              }
+              
+              const [startTime] = currentTimeSlots[slotIndex].split('-');
+              const location = formatLocation(scheduleData.locations[course.locationIndex]);
               
               return {
                 name: course.name,
@@ -417,33 +426,38 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
   }, [getCurrentTimeSlots, getWeekNumber, isCourseActiveInWeek, findNextCourse, isSpecialDate]);
 
   const parseSchedule = useCallback(() => {
-    if (scheduleData) {
-      const now = new Date();
-      const courseInfo = getCourseInfo(scheduleData, now);
-      onParse(courseInfo);
-      
-      // Schedule next update
-      const nextUpdate = getNextScheduleUpdate(scheduleData, now);
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      
-      // Add a small buffer to ensure time has passed, minimum 1 minute between updates
-      timeoutRef.current = setTimeout(() => {
-        parseSchedule();
-      }, Math.max(nextUpdate + 1000, 60000));
+    if (!scheduleData) return;
+    
+    const now = new Date();
+    const courseInfo = getCourseInfo(scheduleData, now);
+    onParse(courseInfo);
+    
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
-  }, [scheduleData, onParse, getCourseInfo, getNextScheduleUpdate]);
+    
+    // Schedule next update
+    const nextUpdate = getNextScheduleUpdate(scheduleData, now);
+    // Add a small buffer to ensure time has passed, minimum 1 minute between updates
+    const delay = Math.max(nextUpdate + 1000, 60000);
+    
+    timeoutRef.current = setTimeout(parseSchedule, delay);
+  }, [scheduleData, onParse]);
 
   useEffect(() => {
-    parseSchedule();
+    if (scheduleData) {
+      parseSchedule();
+    }
     
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
     };
-  }, [parseSchedule]);
+  }, [scheduleData, parseSchedule]);
 
   return null;
 };

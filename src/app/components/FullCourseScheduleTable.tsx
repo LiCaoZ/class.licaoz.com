@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from 'react';
 
+interface CourseData {
+    id: number;
+    name: string;
+    locationIndex: number;
+    weeks?: string;
+    weekSlots?: {
+        weeks: string;
+        slots: string[];
+    }[];
+}
+
 interface ScheduleData {
     timeSlots: {
         summer: string[];
@@ -12,11 +23,7 @@ interface ScheduleData {
         building: string;
         room: string;
     }[];
-    courses: {
-        id: number;
-        name: string;
-        locationIndex: number;
-    }[];
+    courses: CourseData[];
     schedule: {
         [key: string]: [string, number][];
     };
@@ -26,6 +33,7 @@ interface CourseCell {
     name: string;
     location: string;
     slotNumber?: string;
+    weeks?: string;
 }
 
 const FullCourseScheduleTable: React.FC = () => {
@@ -88,6 +96,21 @@ const FullCourseScheduleTable: React.FC = () => {
         return location.room ? `${location.building}-${location.room}` : location.building;
     };
 
+    const getCourseWeeksForSlot = (course: CourseData, slotNumber: string): string => {
+        // Handle courses with weekSlots (variable slot schedules)
+        if (course.weekSlots) {
+            for (const weekSlot of course.weekSlots) {
+                if (weekSlot.slots.includes(slotNumber)) {
+                    return weekSlot.weeks;
+                }
+            }
+            return '';
+        }
+        
+        // Handle regular courses with weeks
+        return course.weeks || '';
+    };
+
     const createScheduleGrid = (): (CourseCell | null)[][] => {
         if (!scheduleData) return [];
 
@@ -110,10 +133,12 @@ const FullCourseScheduleTable: React.FC = () => {
                     const [, courseId] = courseSlot;
                     const course = scheduleData.courses.find(c => c.id === courseId);
                     if (course) {
+                        const weeks = getCourseWeeksForSlot(course, slotNumber);
                         daySchedule.push({
                             name: course.name,
                             location: formatLocation(scheduleData.locations[course.locationIndex]),
-                            slotNumber: slotNumber
+                            slotNumber: slotNumber,
+                            weeks: weeks
                         });
                     } else {
                         daySchedule.push(null);
@@ -171,6 +196,9 @@ const FullCourseScheduleTable: React.FC = () => {
                                                 <div className="font-semibold text-gray-800 dark:text-gray-200 text-sm">{day[slotIndex]?.name}</div>
                                                 {day[slotIndex]?.location && (
                                                     <div className="text-xs text-gray-500 dark:text-gray-500">{day[slotIndex]?.location}</div>
+                                                )}
+                                                {day[slotIndex]?.weeks && (
+                                                    <div className="text-xs text-blue-600 dark:text-blue-400">{day[slotIndex]?.weeks}周</div>
                                                 )}
                                             </div>
                                         ) : (
