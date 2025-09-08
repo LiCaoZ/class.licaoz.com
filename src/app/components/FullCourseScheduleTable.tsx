@@ -84,6 +84,7 @@ const FullCourseScheduleTable: React.FC = () => {
     };
 
     const formatLocation = (location: { building: string; room: string }): string => {
+        if (!location.building && !location.room) return '';
         return location.room ? `${location.building}-${location.room}` : location.building;
     };
 
@@ -143,32 +144,34 @@ const FullCourseScheduleTable: React.FC = () => {
     });
 
     return (
-        <div className="w-full">
-            <div className="overflow-x-auto border border-gray-300 dark:border-gray-700 rounded-lg">
+        <div className="w-full max-w-screen-lg mx-auto">
+            <div className="overflow-x-auto rounded-lg">
                 <table className="w-full bg-white dark:bg-gray-800 text-sm min-w-[800px]">
                     <thead>
                         <tr className="bg-gray-100 dark:bg-gray-700">
-                            <th className="py-2 px-2 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 min-w-[80px]">节次/时间</th>
+                            <th className="py-2 px-2 text-gray-800 dark:text-gray-200 min-w-[80px]">节次/时间</th>
                             {[1, 2, 3, 4, 5, 6, 7].map(day => (
-                                <th key={day} className="py-2 px-2 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 min-w-[120px]">{getDayName(day)}</th>
+                                <th key={day} className="py-2 px-2 text-gray-800 dark:text-gray-200 min-w-[120px]">{getDayName(day)}</th>
                             ))}
                         </tr>
                     </thead>
                     <tbody>
                         {allSlotNumbers.map((slotNumber, slotIndex) => (
                             <tr key={slotNumber} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                <td className="py-2 px-2 border border-gray-300 dark:border-gray-600 font-medium text-center bg-gray-50 dark:bg-gray-800">
+                                <td className="py-2 px-2 font-medium text-center bg-gray-50 dark:bg-gray-800">
                                     <div className="text-gray-800 dark:text-gray-200">第{slotNumber}节</div>
                                     <div className="text-xs text-gray-600 dark:text-gray-400">
                                         {currentTimeSlots[scheduleData?.slotMapping[slotNumber] || 0] || ''}
                                     </div>
                                 </td>
                                 {scheduleGrid.map((day, dayIndex) => (
-                                    <td key={dayIndex} className="py-2 px-2 border border-gray-300 dark:border-gray-600">
+                                    <td key={dayIndex} className="py-2 px-2">
                                         {day[slotIndex] ? (
                                             <div className="space-y-1">
                                                 <div className="font-semibold text-gray-800 dark:text-gray-200 text-sm">{day[slotIndex]?.name}</div>
-                                                <div className="text-xs text-gray-500 dark:text-gray-500">{day[slotIndex]?.location}</div>
+                                                {day[slotIndex]?.location && (
+                                                    <div className="text-xs text-gray-500 dark:text-gray-500">{day[slotIndex]?.location}</div>
+                                                )}
                                             </div>
                                         ) : (
                                             <span className="text-gray-400 dark:text-gray-600">-</span>
