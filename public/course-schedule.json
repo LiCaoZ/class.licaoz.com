@@ -91,15 +91,14 @@
             "name": "思想道德与法治",
             "locationIndex": 1,
             "weekSlots": [
-                {"weeks": "4-15", "slots": ["1", "2", "3"]},
-                {"weeks": "16-17", "slots": ["1", "2"]}
+                {"weeks": "4-17", "slots": ["1", "2"]},
+                {"weeks": "4-15", "slots": ["3"]}
             ]
         },
         {
             "id": 8,
             "name": "大学体育（一）",
-            "locationIndex": 6,
-            "weeks": "4-19"
+            "locationIndex": 6
         }
     ],
     "schedule": {
