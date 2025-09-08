@@ -9,6 +9,18 @@ interface Course {
   name: string;
   time: string;
   location: string;
+  date?: string;
+}
+
+interface CourseData {
+  id: number;
+  name: string;
+  locationIndex: number;
+  weeks?: string;
+  weekSlots?: {
+    weeks: string;
+    slots: string[];
+  }[];
 }
 
 interface ScheduleData {
@@ -23,13 +35,20 @@ interface ScheduleData {
     building: string;
     room: string;
   }[];
-  courses: {
-    id: number;
-    name: string;
-    locationIndex: number;
-  }[];
+  courses: CourseData[];
   schedule: {
     [key: string]: [string, number][];
+  };
+  semesterInfo: {
+    startDate: string;
+    firstClassDate: string;
+    firstClassPeriod: number;
+    endDate: string;
+    specialDates: {
+      holidays: { start: string; end: string; name: string }[];
+      militaryTraining: { start: string; end: string; name: string }[];
+      examPeriod: { start: string; end: string; name: string }[];
+    };
   };
 }
 
@@ -37,20 +56,6 @@ interface CourseInfo {
   current: Course | null;
   next: Course | null;
 }
-
-// Special dates and holidays
-const SPECIAL_DATES = {
-  holidays: [
-    { start: new Date(2025, 9, 1), end: new Date(2025, 9, 8) }, // 10.1-10.8 中秋国庆
-    { start: new Date(2026, 0, 1), end: new Date(2026, 0, 1) }, // 1.1 元旦
-  ],
-  militaryTraining: [
-    { start: new Date(2025, 9, 10), end: new Date(2025, 9, 23) }, // 10.10-10.23 军训
-  ],
-  examPeriod: [
-    { start: new Date(2026, 0, 8), end: new Date(2026, 0, 18) }, // 1.8-1.18 期末考试
-  ]
-};
 
 const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = ({ onParse }) => {
   const [scheduleData, setScheduleData] = useState<ScheduleData | null>(null);
@@ -82,7 +87,7 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
     return offset === -480;
   };
 
-  const getCurrentTimeSlots = (date: Date): string[] => {
+  const getCurrentTimeSlots = useCallback((date: Date): string[] => {
     if (!scheduleData) return [];
     
     // Summer schedule: from first Monday in May until first Monday in October
@@ -109,44 +114,199 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
     } else {
       return scheduleData.timeSlots.autumn;
     }
-  };
+  }, [scheduleData]);
 
   const formatLocation = (location: { building: string; room: string }): string => {
     if (!location.building && !location.room) return '';
     return location.room ? `${location.building}-${location.room}` : location.building;
   };
 
-  const isSpecialDate = (date: Date): string | null => {
+  const getWeekNumber = useCallback((date: Date): number => {
+    if (!scheduleData) return 0;
+    const startDate = new Date(scheduleData.semesterInfo.startDate);
+    const diffTime = date.getTime() - startDate.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.ceil(diffDays / 7);
+  }, [scheduleData]);
+
+  const parseWeekRange = (weekRange: string): { start: number; end: number } => {
+    const [start, end] = weekRange.split('-').map(Number);
+    return { start, end };
+  };
+
+  const isSpecialDate = useCallback((date: Date): string | null => {
+    if (!scheduleData) return null;
+    
     const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     
     // Check holidays
-    for (const holiday of SPECIAL_DATES.holidays) {
-      if (dateOnly >= holiday.start && dateOnly <= holiday.end) {
-        return 'holiday';
+    for (const holiday of scheduleData.semesterInfo.specialDates.holidays) {
+      const start = new Date(holiday.start);
+      const end = new Date(holiday.end);
+      if (dateOnly >= start && dateOnly <= end) {
+        return holiday.name;
       }
     }
     
     // Check military training
-    for (const training of SPECIAL_DATES.militaryTraining) {
-      if (dateOnly >= training.start && dateOnly <= training.end) {
-        return 'military_training';
+    for (const training of scheduleData.semesterInfo.specialDates.militaryTraining) {
+      const start = new Date(training.start);
+      const end = new Date(training.end);
+      if (dateOnly >= start && dateOnly <= end) {
+        return training.name;
       }
     }
     
     // Check exam period
-    for (const exam of SPECIAL_DATES.examPeriod) {
-      if (dateOnly >= exam.start && dateOnly <= exam.end) {
-        return 'exam_period';
+    for (const exam of scheduleData.semesterInfo.specialDates.examPeriod) {
+      const start = new Date(exam.start);
+      const end = new Date(exam.end);
+      if (dateOnly >= start && dateOnly <= end) {
+        return exam.name;
       }
     }
     
     return null;
-  };
+  }, [scheduleData]);
+
+  const isCourseActiveInWeek = useCallback((course: CourseData, weekNumber: number, slotNumber: string): boolean => {
+    // Handle courses with weekSlots (variable slot schedules)
+    if (course.weekSlots) {
+      for (const weekSlot of course.weekSlots) {
+        const { start, end } = parseWeekRange(weekSlot.weeks);
+        if (weekNumber >= start && weekNumber <= end && weekSlot.slots.includes(slotNumber)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    
+    // Handle regular courses with weeks
+    if (course.weeks) {
+      const { start, end } = parseWeekRange(course.weeks);
+      return weekNumber >= start && weekNumber <= end;
+    }
+    
+    return true;
+  }, []);
+
+  const findNextCourse = useCallback((currentDate: Date): Course | null => {
+    if (!scheduleData) return null;
+
+    const utc8Date = isUTC8(currentDate) ? currentDate : convertToUTC8(currentDate);
+    const currentWeek = getWeekNumber(utc8Date);
+    const currentDay = utc8Date.getDay() === 0 ? 7 : utc8Date.getDay();
+    const currentTime = utc8Date.toTimeString().slice(0, 5);
+    const currentTimeSlots = getCurrentTimeSlots(utc8Date);
+    
+    // Check if before semester starts or classes have ended
+    const semesterStart = new Date(scheduleData.semesterInfo.startDate);
+    const firstClassDate = new Date(scheduleData.semesterInfo.firstClassDate);
+    const semesterEnd = new Date(scheduleData.semesterInfo.endDate);
+    
+    if (utc8Date < firstClassDate) {
+      // Find first class
+      for (let day = 1; day <= 7; day++) {
+        const dayCourses = scheduleData.schedule[day.toString()] || [];
+        for (const [slotNumber, courseId] of dayCourses) {
+          const course = scheduleData.courses.find(c => c.id === courseId);
+          if (course && isCourseActiveInWeek(course, 4, slotNumber)) { // Week 4 is when most classes start
+            const slotIndex = scheduleData.slotMapping[slotNumber];
+            if (slotIndex !== undefined && slotIndex < currentTimeSlots.length) {
+              const [startTime] = currentTimeSlots[slotIndex].split('-');
+              const location = formatLocation(scheduleData.locations[course.locationIndex]);
+              
+              const classDate = new Date(firstClassDate);
+              // Adjust to correct day of week
+              const targetDayOffset = day - firstClassDate.getDay();
+              classDate.setDate(classDate.getDate() + targetDayOffset);
+              
+              return {
+                name: course.name,
+                time: startTime,
+                location: location,
+                date: classDate.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })
+              };
+            }
+          }
+        }
+      }
+    }
+    
+    if (utc8Date > semesterEnd) {
+      return null; // Semester has ended
+    }
+
+    // Check remaining courses today
+    const todayCourses = scheduleData.schedule[currentDay.toString()] || [];
+    for (const [slotNumber, courseId] of todayCourses) {
+      if (!isCourseActiveInWeek(scheduleData.courses.find(c => c.id === courseId)!, currentWeek, slotNumber)) {
+        continue;
+      }
+      
+      const slotIndex = scheduleData.slotMapping[slotNumber];
+      if (slotIndex === undefined || slotIndex >= currentTimeSlots.length) continue;
+      
+      const [startTime, endTime] = currentTimeSlots[slotIndex].split('-');
+      
+      if (currentTime < startTime) {
+        const course = scheduleData.courses.find(c => c.id === courseId);
+        if (course) {
+          const location = formatLocation(scheduleData.locations[course.locationIndex]);
+          return {
+            name: course.name,
+            time: `${startTime}-${endTime}`,
+            location: location
+          };
+        }
+      }
+    }
+
+    // Look for next course in coming days
+    for (let dayOffset = 1; dayOffset <= 14; dayOffset++) {
+      const checkDate = new Date(utc8Date);
+      checkDate.setDate(checkDate.getDate() + dayOffset);
+      
+      if (isSpecialDate(checkDate)) continue; // Skip special dates
+      
+      const checkWeek = getWeekNumber(checkDate);
+      const checkDay = checkDate.getDay() === 0 ? 7 : checkDate.getDay();
+      const dayCourses = scheduleData.schedule[checkDay.toString()] || [];
+      
+      for (const [slotNumber, courseId] of dayCourses) {
+        const course = scheduleData.courses.find(c => c.id === courseId);
+        if (course && isCourseActiveInWeek(course, checkWeek, slotNumber)) {
+          const slotIndex = scheduleData.slotMapping[slotNumber];
+          if (slotIndex !== undefined && slotIndex < currentTimeSlots.length) {
+            const [startTime, endTime] = currentTimeSlots[slotIndex].split('-');
+            const location = formatLocation(scheduleData.locations[course.locationIndex]);
+            
+            let dateStr = '';
+            if (dayOffset === 1) {
+              dateStr = '明天';
+            } else {
+              dateStr = checkDate.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+            }
+            
+            return {
+              name: course.name,
+              time: `${startTime}-${endTime}`,
+              location: location,
+              date: dateStr
+            };
+          }
+        }
+      }
+    }
+
+    return null;
+  }, [scheduleData, getCurrentTimeSlots, getWeekNumber, isCourseActiveInWeek, isSpecialDate]);
 
   const getNextScheduleUpdate = useCallback((schedule: ScheduleData, date: Date): number => {
     const utc8Date = isUTC8(date) ? date : convertToUTC8(date);
     const day = utc8Date.getDay() === 0 ? 7 : utc8Date.getDay();
     const currentTime = utc8Date.toTimeString().slice(0, 5);
+    const weekNumber = getWeekNumber(utc8Date);
     
     const todayCourses = schedule.schedule[day];
     const currentTimeSlots = getCurrentTimeSlots(utc8Date);
@@ -160,6 +320,11 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
     }
 
     for (const [slotNumber, courseId] of todayCourses) {
+      const course = schedule.courses.find(c => c.id === courseId);
+      if (!course || !isCourseActiveInWeek(course, weekNumber, slotNumber)) {
+        continue;
+      }
+      
       const slotIndex = schedule.slotMapping[slotNumber];
       
       if (slotIndex === undefined || slotIndex >= currentTimeSlots.length) continue;
@@ -186,7 +351,7 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(0, 0, 0, 0);
     return tomorrow.getTime() - utc8Date.getTime();
-  }, [getCurrentTimeSlots]);
+  }, [getCurrentTimeSlots, getWeekNumber, isCourseActiveInWeek]);
 
   const getCourseInfo = useCallback((schedule: ScheduleData, date: Date): CourseInfo => {
     const utc8Date = isUTC8(date) ? date : convertToUTC8(date);
@@ -199,10 +364,11 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
 
     const day = utc8Date.getDay() === 0 ? 7 : utc8Date.getDay();
     const currentTime = utc8Date.toTimeString().slice(0, 5);
+    const weekNumber = getWeekNumber(utc8Date);
     
     const todayCourses = schedule.schedule[day];
     
-    if (!todayCourses) return { current: null, next: null };
+    if (!todayCourses) return { current: null, next: findNextCourse(utc8Date) };
 
     const currentTimeSlots = getCurrentTimeSlots(utc8Date);
     let currentCourse: Course | null = null;
@@ -210,14 +376,17 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
 
     for (let i = 0; i < todayCourses.length; i++) {
       const [slotNumber, courseId] = todayCourses[i];
+      const course = schedule.courses.find(c => c.id === courseId);
+      
+      if (!course || !isCourseActiveInWeek(course, weekNumber, slotNumber)) {
+        continue;
+      }
+      
       const slotIndex = schedule.slotMapping[slotNumber];
       
       if (slotIndex === undefined || slotIndex >= currentTimeSlots.length) continue;
       
       const [startTime, endTime] = currentTimeSlots[slotIndex].split('-');
-      const course = schedule.courses.find(c => c.id === courseId);
-
-      if (!course) continue;
 
       const location = formatLocation(schedule.locations[course.locationIndex]);
       const courseInfo: Course = {
@@ -228,26 +397,8 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
 
       if (currentTime >= startTime && currentTime < endTime) {
         currentCourse = courseInfo;
-        // Find next course
-        for (let j = i + 1; j < todayCourses.length; j++) {
-          const [nextSlotNumber, nextCourseId] = todayCourses[j];
-          const nextSlotIndex = schedule.slotMapping[nextSlotNumber];
-          
-          if (nextSlotIndex === undefined || nextSlotIndex >= currentTimeSlots.length) continue;
-          
-          const [nextStartTime, nextEndTime] = currentTimeSlots[nextSlotIndex].split('-');
-          const nextCourseData = schedule.courses.find(c => c.id === nextCourseId);
-          
-          if (nextCourseData) {
-            const nextLocation = formatLocation(schedule.locations[nextCourseData.locationIndex]);
-            nextCourse = {
-              name: nextCourseData.name,
-              time: `${nextStartTime}-${nextEndTime}`,
-              location: nextLocation
-            };
-            break;
-          }
-        }
+        // Find next course today or in future
+        nextCourse = findNextCourse(utc8Date);
         break;
       }
 
@@ -257,8 +408,13 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
       }
     }
 
+    // If no next course found today, look for future courses
+    if (!nextCourse) {
+      nextCourse = findNextCourse(utc8Date);
+    }
+
     return { current: currentCourse, next: nextCourse };
-  }, [getCurrentTimeSlots]);
+  }, [getCurrentTimeSlots, getWeekNumber, isCourseActiveInWeek, findNextCourse, isSpecialDate]);
 
   const parseSchedule = useCallback(() => {
     if (scheduleData) {
@@ -272,10 +428,10 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
         clearTimeout(timeoutRef.current);
       }
       
-      // Add a small buffer to ensure time has passed
+      // Add a small buffer to ensure time has passed, minimum 1 minute between updates
       timeoutRef.current = setTimeout(() => {
         parseSchedule();
-      }, Math.max(nextUpdate + 1000, 60000)); // At least 1 minute between updates
+      }, Math.max(nextUpdate + 1000, 60000));
     }
   }, [scheduleData, onParse, getCourseInfo, getNextScheduleUpdate]);
 
