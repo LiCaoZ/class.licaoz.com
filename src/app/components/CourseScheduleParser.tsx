@@ -187,7 +187,8 @@ const CourseScheduleParser: React.FC<{ onParse: (info: CourseInfo) => void }> = 
       return weekNumber >= start && weekNumber <= end;
     }
     
-    return true;
+    // Courses without week labels should be ignored
+    return false;
   }, []);
 
   const findNextCourse = useCallback((currentDate: Date): Course | null => {
